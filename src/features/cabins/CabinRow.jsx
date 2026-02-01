@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import React from "react";
+import React, { useState } from "react";
 
 const TableRow = styled.div`
   display: grid;
@@ -44,11 +44,16 @@ import PropTypes from "prop-types";
 import { useMutation, useQueryClient} from "@tanstack/react-query";
 import {deleteCabin} from "../../services/apiCabins.js"
 import toast from "react-hot-toast";
-
+import CreateCabinForm from "./CreateCabinForm.jsx"
+import Button from "../../ui/Button.jsx";
+import ButtonGroup from "../../ui/ButtonGroup.jsx";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 
 function CabinRow({ cabin }) {
 
+
+    const [showForm,setShowForm] = useState(false);
     const queryClient = useQueryClient();
     const { id,name, maxCapacity, regularPrice, discount, image } = cabin;
 
@@ -59,7 +64,7 @@ function CabinRow({ cabin }) {
             toast.success("Cabin successfully deleted");
             queryClient.invalidateQueries({
 
-                queryKey:["cabin"]
+                queryKey:["cabins"]
             });
         }
         ,
@@ -69,19 +74,36 @@ function CabinRow({ cabin }) {
 
   return (
 
-        <TableRow role="row">
+
+    <>
+
+    <TableRow role="row">
 
             <Img src={image}/>
             <Cabin>{name}</Cabin>
             <div>Fitsupto {maxCapacity} guests</div>
 
             <Price>{regularPrice}</Price>
-            <Discount>{discount}</Discount>
+{discount === 0 ? <span>&mdash;</span> : <Discount>{discount}</Discount>}
 
 
-            <button onClick={() => mutate(id)} disabled={isDeleting}>Delete</button>
+
+<ButtonGroup>
+  <Button size="small" variation="primary" onClick={() => setShowForm((show) => !show)}>
+    <FaEdit />
+    Edit
+  </Button>
+
+  <Button size="small" variation="danger" onClick={() => mutate(id)} disabled={isDeleting}>
+    <FaTrash />
+    Delete
+  </Button>
+</ButtonGroup>
 
         </TableRow>
+
+        {showForm && <CreateCabinForm cabinToEdit={cabin} setShowForm={setShowForm}/>}
+    </>
   );
 }
 

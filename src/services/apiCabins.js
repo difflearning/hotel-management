@@ -29,31 +29,72 @@ export async function deleteCabin(id){
       return data;
 }
 
-export async function insertCabin(newCabin) {
-  const base_url =
-    "https://dpmlnysinyurcvotfsda.supabase.co/storage/v1/object/public/cabin-images";
+export async function createEditCabin(newCabin,id=null) {
+  
+  // const hasImagePath = newCabin?.image?.startsWidth(supabase);
 
-  const imageName = `${Math.random()}-${newCabin.image[0].name}`.replaceAll("/", "");
-  const imagePath = `${base_url}/${imageName}`;
+  const hasImagePath = typeof newCabin.image === "string" &&
+                     newCabin.image.startsWith(
+                       "https://dpmlnysinyurcvotfsda.supabase.co/"
+                     );
 
-  // 1️⃣ Insert row
-  const { data, error: insertEr } = await supabase
+
+  console.log(id);
+  console.log(newCabin);
+
+const BASE_URL =
+  "https://dpmlnysinyurcvotfsda.supabase.co/storage/v1/object/public/cabin-images";
+
+
+  const imageName = `${crypto.randomUUID()}-${newCabin.image.name}`.replaceAll("/","");
+
+
+const imagePath = hasImagePath
+  ? newCabin.image
+  : `${BASE_URL}/${imageName}`;
+
+
+    let  query = null ;
+
+
+
+// 1️⃣ Insert or update row
+if(!id){
+
+    query = supabase
     .from("cabins")
     .insert([{ ...newCabin, image: imagePath }])
-    .select();
+    .select()
+    .single();
 
-  if (insertEr) throw new Error("Cabin could not be inserted");
+}
 
-  // 2️⃣ Upload image
+if (id) {
+  query = supabase
+    .from("cabins")
+    .update({ ...newCabin, image: imagePath })
+    .eq("id", Number(id))
+    .select()
+    .single();
+}
+
+const { data, error } = await query;
+if (error) throw new Error(error.message);
+
+// 2️⃣ Upload image only if new
+if (!hasImagePath) {
+
+
   const { error: storageEr } = await supabase.storage
     .from("cabin-images")
-    .upload(imageName, newCabin.image[0]);
+    .upload(imageName, newCabin.image);
 
-  // 3️⃣ Rollback if upload fails
   if (storageEr) {
-    await supabase.from("cabins").delete().eq("id", data[0].id);
-    throw new Error("Image upload failed");
+    await supabase.from("cabins").delete().eq("id", data.id);
+    throw new Error(storageEr.message);
   }
+}
 
-  return data;
+return data;
+
 }

@@ -1,200 +1,189 @@
-
-
 import React from "react";
-
-import Input from "../../ui/Input";
-
-import Form from "../../ui/Form";
-
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-
-import {insertCabin} from "../../services/apiCabins";
 import toast from "react-hot-toast";
+
+import Form from "../../ui/Form";
+import FormRow from "../../ui/FormRow";
+import Input from "../../ui/Input";
+import Textarea from "../../ui/Textarea";
+import FileInput from "../../ui/FileInput";
+import Button from "../../ui/Button";
 import Spinner from "../../ui/Spinner";
 
-import  FormRow from "../../ui/FormRow";
+import { createEditCabin } from "../../services/apiCabins";
+
+import PropTypes from "prop-types";
+CreateCabinForm.propTypes = {
+  cabinToEdit: PropTypes.bool,
+};
 
 
-import Textarea from "../../ui/Textarea"
-import FileInput from "../../ui/FileInput"
-import Button from "../../ui/Button"
+function CreateCabinForm({ cabinToEdit = {} },setShowForm) {
+
+    // Destructure id as cabinId, and everything else as editValues
+  // const { id: cabinId, ...editValues } = cabinToEdit;
 
 
-// const FormRow = styled.div`
-//   display: grid;
-//   align-items: center;
-//   grid-template-columns: 24rem 1fr 1.2fr;
-//   gap: 2.4rem;
+  const { id: rawId, ...editValues } = cabinToEdit;
 
-//   padding: 1.2rem 0;
-
-//   &:first-child {
-//     padding-top: 0;
-//   }
-
-//   &:last-child {
-//     padding-bottom: 0;
-//   }
-
-//   &:not(:last-child) {
-//     border-bottom: 1px solid var(--color-grey-100);
-//   }
-
-//   &:has(button) {
-//     display: flex;
-//     justify-content: flex-end;
-//     gap: 1.2rem;
-//   }
-// `;
-
-// const Label = styled.label`
-//   font-weight: 500;
-// `;
-
-// const Error = styled.span`
-//   font-size: 1.4rem;
-//   color: var(--color-red-700);
-// `;
-
-function CreateCabinForm() {
+  // Normalize id to a number if it exists
+  const cabinId = rawId && typeof rawId === "object" ? rawId.id : rawId;
 
 
-  const {
-  register,
-  handleSubmit,
-  reset,
-  getValues,
-  formState: { errors },
-} = useForm();
+  const isEditingForm = !!cabinId; // true if cabinId exists, false otherwise
+  
+    const {
+    register,
+    handleSubmit,
+    reset,
+    getValues,
+    formState: { errors },
+    } = useForm({
 
-  const queryClient = useQueryClient();
-
-
-
-  const {mutate,isLoading:isCreating}=useMutation({
-
-      mutationFn:insertCabin,
-      onSuccess:()=>{
-
-        toast.success("Successfully created ");
+    defaultValues: isEditingForm   ? editValues:{}
+  
+    });
 
 
-           queryClient.invalidateQueries({
+    
 
-                queryKey:["cabin"]
-            });
+    const queryClient = useQueryClient();
 
-       reset();
-      }
-      ,
+  const { mutate:createCabin, isLoading: isCreating } = useMutation({
+   mutationFn: (newCabinData) => createEditCabin(newCabinData, null), // always passes id=null
+    onSuccess: () => {
+      toast.success("Cabin successfully created");
+      queryClient.invalidateQueries({ queryKey: ["cabins"] });
+      reset();
 
-      onError: (err) => toast.error(err.message),
-
+    },
+    onError: (err) => toast.error(err.message),
   });
 
-  function onSubmit(data){
 
-    mutate(data);
+  const { mutate: updateCabin, isLoading: isUpdating } = useMutation({
+  mutationFn: ({ newCabinData, id }) => createEditCabin(newCabinData, id),
+  onSuccess: (data) => {
+    console.log("Updated cabin:", data); // <- actual response
+    toast.success("Cabin successfully updated");
+    queryClient.invalidateQueries({ queryKey: ["cabins"] });
+    reset();
+    
+
+  },
+  onError: (err) => toast.error(err.message),
+});
+
+
+  const isWorking = isCreating || isUpdating;
+
+  function onSubmit(data) {
+    // const image =
+    //   typeof data.image === "string" ? data.image : data.image[0];
+
+      const image = typeof data.image === "string" ? data.image : data.image?.[0] ?? null;
+      isEditingForm ? updateCabin({newCabinData:{...data,image:image},id:cabinId}) :createCabin({ ...data, image });
+
+     setShowForm(false);
   }
 
+  if (isWorking === true) return <Spinner />;
 
-  function onError(error){
-
-
-      console.log(error);
-
-  }
-  
-
-
-
-
-  {isCreating && <Spinner/>}
   return (
-    <Form  onSubmit={handleSubmit(onSubmit,onError)}>
-      <FormRow label="Cabin name" error={errors.name?.message} >
-
-        <Input type="text" id="name" {...register('name',{
-
-            required:"This field is required"
-        })} />
-
+    <Form onSubmit={handleSubmit(onSubmit)}>
+      <FormRow label="Cabin name" error={errors.name?.message}>
+        <Input
+          type="text"
+          id="name"
+          {...register("name", {
+            required: "This field is required",
+          })}
+        />
       </FormRow>
-
 
       <FormRow label="Maximum capacity" error={errors.maxCapacity?.message}>
-
-        <Input type="number" id="maxCapacity" {...register('maxCapacity',{
-
-
-
-
-            required:"This field is required",
-            min:{
-
-                value:1,
-                message:"Capacity should be at least"
-            }
-
-        })
-
-          
-
-
-        } />
+        <Input
+          type="number"
+          id="maxCapacity"
+          {...register("maxCapacity", {
+            required: "This field is required",
+            valueAsNumber: true,
+            min: {
+              value: 1,
+              message: "Capacity must be at least 1",
+            },
+          })}
+        />
       </FormRow>
 
-
-      <FormRow  label="Regular price" error={errors.regularPrice?.message}>
-
-        <Input type="number" id="regularPrice" {...register('regularPrice',{
-
-            required:"This field is required",
-            min:{
-
-                value:1,
-                message:"Capacity should be at least"
-            }
-        })}/>
+      <FormRow label="Regular price" error={errors.regularPrice?.message}>
+        <Input
+          type="number"
+          id="regularPrice"
+          {...register("regularPrice", {
+            required: "This field is required",
+            valueAsNumber: true,
+            min: {
+              value: 1,
+              message: "Price must be at least 1",
+            },
+          })}
+        />
       </FormRow>
 
-
-       <FormRow  label="Discount"  error={errors.discount?.message}>
-
-        <Input type="number" id="discount" defaultValue={0} {...register('discount',{
-
-            required:"This field is rquired",
-            validate: (value) => value < getValues().regularPrice || "Discount should be less than regular price"
-        })} />
-
+      <FormRow label="Discount" error={errors.discount?.message}>
+        <Input
+          type="number"
+          id="discount"
+          defaultValue={0}
+          {...register("discount", {
+            required: "This field is required",
+            validate: (value) =>
+              Number(value) <= Number(getValues().regularPrice) ||
+              "Discount should be less than regular price",
+                valueAsNumber: true,
+          })}
+        />
       </FormRow>
 
-
-        
-      <FormRow label="Description for website" >
-
-        <Textarea type="number" id="description" defaultValue="" {...register('description')}/>
+      <FormRow label="Description for website">
+        <Textarea id="description" {...register("description")} />
       </FormRow>
 
-
-        
-      <FormRow label="Cabin photo">
-
-        <FileInput id="image" accept="image/*"  {...register("image",{
-
-            required:"This field is required"
-        })} />
+      <FormRow label="Cabin photo" error={errors.image?.message}>
+        <FileInput
+          id="image"
+          accept="image/*"
+          {...register("image", {
+            required: isEditingForm? false:"This field is required",
+          })}
+        />
       </FormRow>
 
       <FormRow>
-        {/* type is an HTML attribute! */}
-        <Button variation="secondary" type="reset">
+        <Button
+    
+
+          size="small"
+          variation="secondary"
+          type="reset"
+          onClick={()=> setShowForm(false)} 
+          disabled={isWorking}
+        >
           Cancel
         </Button>
-        <Button sizes="small" variation="primary" type="submit"  disabled={isCreating}>Edit cabin</Button>
+
+        <Button
+
+                    size="small"
+          variation="primary"
+          type="submit"
+          disabled={isWorking}
+        >
+        {isEditingForm ? "Edit cabin" : "Add cabin"}
+        </Button>
       </FormRow>
-   
     </Form>
   );
 }
